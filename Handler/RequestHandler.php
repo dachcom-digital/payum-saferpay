@@ -76,7 +76,13 @@ class RequestHandler
             ]
         ];
 
-        $requestData = $this->mergeOptionalRequestData($requestData, $data);
+        // merge additional data coming from the convert payment action (and extensions) like language
+        $requestData = $this->mergeOptionalPaymentExtensionData($requestData, $data);
+
+        // merge optional api options
+        if (!empty($this->options['optional_params'])) {
+            $requestData = $this->mergeOptionalApiOptions($requestData, $this->options['optional_params']);
+        }
 
         $url = $this->getApiEndpoint() . self::PAYMENT_PAGE_INITIALIZE_PATH;
         $request = $this->doRequest($requestData, $url);
@@ -293,16 +299,8 @@ class RequestHandler
      * @param $data
      * @return mixed
      */
-    private function mergeOptionalRequestData($requestData, $data)
+    private function mergeOptionalPaymentExtensionData($requestData, $data)
     {
-        /**
-         * config set
-         * Example: name of your payment page config (case-insensitive)
-         */
-        if (isset($data['optional_config_set'])) {
-            $requestData['ConfigSet'] = (string)$data['optional_config_set'];
-        }
-
         /**
          * language code. allowed code-List:
          * de - German
@@ -333,31 +331,73 @@ class RequestHandler
             $requestData['Payer']['LanguageCode'] = (string)$data['optional_payer_language_code'];
         }
 
+        return $requestData;
+
+    }
+
+    /**
+     * @param $requestData
+     * @param $data
+     * @return mixed
+     */
+    private function mergeOptionalApiOptions($requestData, $data)
+    {
+        /**
+         * config set
+         * Example: name of your payment page config (case-insensitive)
+         */
+        if (isset($data['config_set'])) {
+            $requestData['ConfigSet'] = (string)$data['config_set'];
+        }
+
         /**
          * payment methods
          * Possible values: AMEX, BANCONTACT, BONUS, DINERS, DIRECTDEBIT, EPRZELEWY, EPS, GIROPAY, IDEAL, INVOICE, JCB, MAESTRO, MASTERCARD, MYONE, PAYPAL, PAYDIREKT, POSTCARD, POSTFINANCE, SOFORT, TWINT, UNIONPAY, VISA.
          */
-        if (isset($data['optional_payment_methods']) && is_array($data['optional_payment_methods'])) {
-            $requestData['PaymentMethods'] = $data['optional_payment_methods'];
+        if (isset($data['payment_methods']) && !empty($data['payment_methods'])) {
+            $PaymentMethods = $data['payment_methods'];
+            if (is_string($PaymentMethods) && strpos($PaymentMethods, ',') !== false) {
+                $PaymentMethods = explode(',', $PaymentMethods);
+            }
+
+            $requestData['PaymentMethods'] = (array) $PaymentMethods;
         }
 
-        //notifications
-        if (isset($data['optional_notification_merchant_email'])) {
-            $requestData['Notification']['PayerEmail'] = $data['optional_notification_merchant_email'];
+        /**
+         * wallets
+         * Possible values: MASTERPASS
+         */
+        $wallets = [];
+        if (isset($data['wallets']) && !empty($data['wallets'])) {
+            $wallets = $data['wallets'];
+            if (is_string($wallets) && strpos($wallets, ',') !== false) {
+                $wallets = explode(',', $data['wallets']);
+            }
         }
-        if (isset($data['optional_notification_payer_email'])) {
-            $requestData['Notification']['PayerEmail'] = $data['optional_notification_payer_email'];
+
+        $requestData['Wallets'] = (array) $wallets;
+
+        //notifications
+        if (isset($data['notification_merchant_email'])) {
+            $requestData['Notification']['PayerEmail'] = $data['notification_merchant_email'];
+        }
+        if (isset($data['notification_payer_email'])) {
+            $requestData['Notification']['PayerEmail'] = $data['notification_payer_email'];
         }
 
         //styling
-        if (isset($data['optional_styling_css_url'])) {
-            $requestData['Styling']['CssUrl'] = $data['optional_styling_css_url'];
+        if (isset($data['styling_css_url'])) {
+            $requestData['Styling']['CssUrl'] = $data['styling_css_url'];
         }
-        if (isset($data['optional_styling_content_security_enabled'])) {
-            $requestData['Styling']['ContentSecurityEnabled'] = $data['optional_styling_content_security_enabled'];
+        if (isset($data['styling_content_security_enabled'])) {
+            $requestData['Styling']['ContentSecurityEnabled'] = $data['styling_content_security_enabled'];
         }
-        if (isset($data['optional_styling_theme'])) {
-            $requestData['Styling']['Theme'] = $data['optional_styling_theme'];
+
+        /**
+         * Possible values: DEFAULT, SIX, NONE
+         */
+        if (isset($data['styling_theme'])) {
+            $requestData['Styling']['Theme'] = $data['styling_theme'];
         }
 
         return $requestData;

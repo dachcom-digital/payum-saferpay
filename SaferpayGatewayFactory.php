@@ -41,9 +41,10 @@ class SaferpayGatewayFactory extends GatewayFactory
 
         if (false == $config['payum.api']) {
             $config['payum.default_options'] = [
-                'environment' => Api::TEST,
-                'specVersion' => '1.8', //https://saferpay.github.io/jsonapi/index.html
-                'sandbox'     => true,
+                'environment'     => Api::TEST,
+                'specVersion'     => '1.8', //https://saferpay.github.io/jsonapi/index.html
+                'optionalParameters' => [],
+                'sandbox'         => true,
             ];
             $config->defaults($config['payum.default_options']);
             $config['payum.required_options'] = [
@@ -59,12 +60,13 @@ class SaferpayGatewayFactory extends GatewayFactory
 
                 return new Api(
                     [
-                        'sandbox'      => $config['environment'] === Api::TEST,
-                        'username'     => $config['username'],
-                        'password'     => $config['password'],
-                        'spec_version' => $config['specVersion'],
-                        'customer_id'  => $config['customerId'],
-                        'terminal_id'  => $config['terminalId']
+                        'sandbox'         => $config['environment'] === Api::TEST,
+                        'username'        => $config['username'],
+                        'password'        => $config['password'],
+                        'spec_version'    => $config['specVersion'],
+                        'customer_id'     => $config['customerId'],
+                        'terminal_id'     => $config['terminalId'],
+                        'optional_params' => isset($config['optionalParameters']) && is_array($config['optionalParameters']) ? $config['optionalParameters'] : []
                     ],
                     $config['payum.http_client'],
                     $config['httplug.message_factory']
