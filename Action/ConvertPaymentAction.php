@@ -4,17 +4,18 @@ namespace DachcomDigital\Payum\Saferpay\Action;
 
 use DachcomDigital\Payum\Saferpay\Api;
 use Payum\Core\Action\ActionInterface;
-use Payum\Core\ApiAwareInterface;
-use Payum\Core\ApiAwareTrait;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\Exception\UnsupportedApiException;
+use Payum\Core\GatewayAwareInterface;
+use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Model\PaymentInterface;
 use Payum\Core\Request\Convert;
+use Payum\Core\Request\GetCurrency;
 
-class ConvertPaymentAction implements ActionInterface, ApiAwareInterface
+class ConvertPaymentAction implements ActionInterface, GatewayAwareInterface
 {
-    use ApiAwareTrait;
+    use GatewayAwareTrait;
 
     /**
      * @var Api
@@ -43,13 +44,12 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface
 
         /** @var PaymentInterface $payment */
         $payment = $request->getSource();
-
+        $this->gateway->execute($currency = new GetCurrency($payment->getCurrencyCode()));
         $details = ArrayObject::ensureArrayObject($payment->getDetails());
-
-        $details['currencyCode'] = $payment->getCurrencyCode();
+        $details['currency_code'] = $payment->getCurrencyCode();
         $details['amount'] = $payment->getTotalAmount();
-        $details['externalReference'] = $payment->getNumber();
-
+        $details['order_id'] = $payment->getNumber();
+        $details['description'] = $payment->getDescription();
         $request->setResult((array)$details);
     }
 

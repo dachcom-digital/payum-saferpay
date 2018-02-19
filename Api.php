@@ -2,33 +2,22 @@
 
 namespace DachcomDigital\Payum\Saferpay;
 
-use DachcomDigital\Payum\Saferpay\Exception\SaferpayException;
+use DachcomDigital\Payum\Saferpay\Handler\RequestHandler;
 use Http\Message\MessageFactory;
 use Payum\Core\Bridge\Spl\ArrayObject;
-use Payum\Core\Exception\Http\HttpException;
 use Payum\Core\Exception\LogicException;
 use Payum\Core\HttpClientInterface;
 
 class Api
 {
     /**
-     * @var HttpClientInterface
+     * @var RequestHandler
      */
-    protected $client;
-
-    /**
-     * @var MessageFactory
-     */
-    protected $messageFactory;
+    protected $requestHandler;
 
     const TEST = 'test';
 
     const PRODUCTION = 'production';
-
-    // parameters that will be included in the SHA-OUT Hash
-    protected $signatureParams = [
-
-    ];
 
     protected $options = [
         'environment' => self::TEST
@@ -48,8 +37,9 @@ class Api
         $options->validateNotEmpty([
             'username',
             'password',
-            'SpecVersion',
-            'CustomerId'
+            'spec_version',
+            'customer_id',
+            'terminal_id'
         ]);
 
         if (false == is_bool($options['sandbox'])) {
@@ -57,65 +47,124 @@ class Api
         }
 
         $this->options = $options;
-        $this->client = $client;
-        $this->messageFactory = $messageFactory;
-    }
-
-    /**
-     * @param ArrayObject $details
-     * @return array
-     * @throws SaferpayException
-     */
-    public function generateRequest(ArrayObject $details)
-    {
-        try {
-            $request = $this->doRequest();
-        } catch (\Exception $e) {
-            throw new SaferpayException($e->getMessage());
-        }
-
-        return $request;
+        $this->requestHandler = new RequestHandler($client, $messageFactory, $this->options);
     }
 
     /**
      * @param array $fields
-     * @return \Psr\Http\Message\ResponseInterface
+     *
+     * @return array
      */
-    protected function doRequest(array $fields)
+    public function createTransaction(array $fields)
     {
-        $headers = [
-            'Authorization' => 'Basic ' . base64_encode($this->options['username'] . ':' . $this->options['password']),
-            'Content-Type'  => 'application/x-www-form-urlencoded',
-        ];
+        $response = $this->requestHandler->createTransactionRequest($fields);
 
-        /** @var \GuzzleHttp\Psr7\Request $request */
-        $request = $this->messageFactory->createRequest('POST', $this->getApiEndpoint(), $headers, http_build_query($fields));
-
-        $response = $this->client->send($request);
-        if (false == ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300)) {
-            throw HttpException::factory($request, $response);
-        }
-
-        $xmlResponse = $response->getBody()->getContents();
-
-        try {
-           //$xmlResponse
-        } catch (\Exception $e) {
-            throw new LogicException("Response content is not valid xml: \n\n{$xmlResponse}");
-        }
-
-        return $response;
+        return array_filter([
+            'error'        => $response['has_error'] === true ? $response['data'] : false,
+            'token'        => $response['token'],
+            'redirect_url' => $response['redirect_url'],
+        ]);
     }
 
     /**
-     * @return string
+     * @param $token
+     *
+     * @return array
      */
-    public function getApiEndpoint()
+    public function getTransactionData($token)
     {
-        if ($this->options['sandbox'] === false) {
-            return 'https://www.saferpay.com/api';
+        $response = $this->requestHandler->createTransactionAssertRequest($token);
+
+        $params = [];
+
+        if ($response['has_error'] === true) {
+            $params['error'] = $response['error'];
+        } else {
+
+            $transaction = $response['transaction'];
+            $params['transaction_type'] = $transaction['Type'];
+            $params['transaction_status'] = $transaction['Status'];
+            $params['transaction_id'] = $transaction['Id'];
+            $params['transaction_date'] = $transaction['Date'];
+            $params['transaction_amount'] = $transaction['Amount']['Value'];
+            $params['transaction_currency_code'] = $transaction['Amount']['CurrencyCode'];
+            $params['transaction_acquirer_name'] = $transaction['AcquirerName'];
+            $params['transaction_acquirer_reference'] = $transaction['AcquirerReference'];
+            $params['transaction_six_transaction_reference'] = $transaction['SixTransactionReference'];
+            $params['transaction_approval_code'] = $transaction['ApprovalCode'];
+
+            $paymentMeans = $response['payment_means'];
+            $params['payment_means_brand_payment_method'] = $paymentMeans['Brand']['PaymentMethod'];
+            $params['payment_means_brand_name'] = $paymentMeans['Brand']['Name'];
+
+            $params['payment_means_display_text'] = $paymentMeans['DisplayText'];
+            $params['payment_means_wallet'] = $paymentMeans['Wallet'];
+
+            $params['payment_means_cart_masked_number'] = $paymentMeans['Card']['MaskedNumber'];
+            $params['payment_means_cart_exp_year'] = $paymentMeans['Card']['ExpYear'];
+            $params['payment_means_cart_exp_month'] = $paymentMeans['Card']['ExpMonth'];
+            $params['payment_means_cart_holder_name'] = $paymentMeans['Card']['HolderName'];
+            $params['payment_means_cart_hash_value'] = $paymentMeans['Card']['HashValue'];
+
+            $params['payment_means_bank_account_iban'] = $paymentMeans['BankAccount']['IBAN'];
+            $params['payment_means_bank_account_holder_name'] = $paymentMeans['BankAccount']['HolderName'];
+            $params['payment_means_bank_account_bic'] = $paymentMeans['BankAccount']['BIC'];
+            $params['payment_means_bank_account_bank_name'] = $paymentMeans['BankAccount']['BankName'];
+            $params['payment_means_bank_account_country_code'] = $paymentMeans['BankAccount']['CountryCode'];
+
+            $payer = $response['payer'];
+            $params['payment_payer_ip_address'] = $payer['IpAddress'];
+            $params['payment_payer_ip_location'] = $payer['IpLocation'];
         }
 
-        return 'https://test.saferpay.com/api';
+        return array_filter($params);
+    }
+
+    /**
+     * @param $transactionId
+     * @return array
+     */
+    public function captureTransaction($transactionId)
+    {
+        $response = $this->requestHandler->createTransactionCaptureRequest($transactionId);
+
+        $params = [];
+
+        if ($response['has_error'] === true) {
+            $params['error'] = $response['error'];
+        } else {
+            $params['transaction_id'] = $response['transaction_id'];
+            $params['transaction_status'] = $response['transaction_status'];
+            $params['transaction_date'] = $response['date'];
+        }
+
+        return array_filter($params);
+    }
+
+    /**
+     * @param array $fields
+     *
+     * @return array
+     */
+    public function refundTransaction(array $fields)
+    {
+        $response = $this->requestHandler->createRefundRequest($fields);
+
+        $params = [];
+
+        if ($response['has_error'] === true) {
+            $params['error'] = $response['error'];
+        } else {
+            $transaction = $response['transaction'];
+            $params['transaction_id'] = $transaction['Id'];
+            $params['transaction_type'] = $transaction['Type'];
+            $params['transaction_status'] = $transaction['Status'];
+            $params['transaction_date'] = $transaction['Date'];
+            $params['transaction_amount'] = $transaction['Amount']['Value'];
+            $params['transaction_currency_code'] = $transaction['Amount']['CurrencyCode'];
+        }
+
+        return array_filter($params);
+
     }
 }

@@ -2,82 +2,96 @@
 
 namespace DachcomDigital\Payum\Saferpay\Action;
 
-use DachcomDigital\Payum\Saferpay\Api;
-use DachcomDigital\Payum\Saferpay\Request\Api\Activate;
+use League\Uri\Http as HttpUri;
+use League\Uri\Modifiers\MergeQuery;
 use Payum\Core\Action\ActionInterface;
-use Payum\Core\ApiAwareInterface;
-use Payum\Core\ApiAwareTrait;
-use Payum\Core\Bridge\Spl\ArrayObject;
-use Payum\Core\Exception\RequestNotSupportedException;
-use Payum\Core\Exception\UnsupportedApiException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
-use Payum\Core\Request\Authorize;
-use Payum\Core\Request\Capture;
 use Payum\Core\Request\GetHttpRequest;
-use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryAwareTrait;
+use DachcomDigital\Payum\Saferpay\Request\Api\CreateTransaction;
+use DachcomDigital\Payum\Saferpay\Request\Api\CapturePayment;
+use Payum\Core\Bridge\Spl\ArrayObject;
+use Payum\Core\Exception\RequestNotSupportedException;
+use Payum\Core\Request\Capture;
+use Payum\Core\Request\Sync;
+use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 
-/**
- * @property Api $api
- */
-class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
+class CaptureAction implements ActionInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
 {
-    use ApiAwareTrait;
     use GatewayAwareTrait;
     use GenericTokenFactoryAwareTrait;
-
+    
     /**
-     * @var Api
-     */
-    protected $api;
-
-    /**
-     * {@inheritDoc}
-     */
-    public function setApi($api)
-    {
-        if (false == $api instanceof Api) {
-            throw new UnsupportedApiException('Not supported.');
-        }
-        $this->api = $api;
-    }
-
-    /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      *
      * @param Capture $request
      */
     public function execute($request)
     {
+        /* @var $request Capture */
         RequestNotSupportedException::assertSupports($this, $request);
 
         $details = ArrayObject::ensureArrayObject($request->getModel());
 
-        if (false == $details['clientIp']) {
-            $this->gateway->execute($httpRequest = new GetHttpRequest());
-            $details['clientIp'] = $httpRequest->clientIp;
+        $this->gateway->execute($httpRequest = new GetHttpRequest());
+        if (isset($httpRequest->query['cancelled'])) {
+            $details['transaction_cancelled'] = true;
+            return;
         }
 
-        if (false == $details['mfReference']) {
-            $this->gateway->execute(new Authorize($details));
+        if (isset($httpRequest->query['failed'])) {
+            $details['transaction_failed'] = true;
+            return;
         }
 
-        if ($details['mfReference']
-            && isset($details['responseCode']) && $details['responseCode'] === StatusAction::CHECK_CREDIT_OK
-            && isset($details['creditRefusalReason']) && $details['creditRefusalReason'] === StatusAction::REFUSAL_REASON_NONE
-        ) {
-            $this->gateway->execute(new Activate($details));
+        if (false == $details['token']) {
+
+            if (false == $details['success_url'] && $request->getToken()) {
+                $details['success_url'] = $request->getToken()->getTargetUrl();
+            }
+
+            if (false == $details['fail_url'] && $request->getToken()) {
+                $failedUrl = HttpUri::createFromString($request->getToken()->getTargetUrl());
+                $modifier = new MergeQuery('failed=1');
+                $failedUrl = $modifier->process($failedUrl);
+                $details['fail_url'] = (string)$failedUrl;
+            }
+
+            if (false == $details['abort_url'] && $request->getToken()) {
+                $cancelUri = HttpUri::createFromString($request->getToken()->getTargetUrl());
+                $modifier = new MergeQuery('cancelled=1');
+                $cancelUri = $modifier->process($cancelUri);
+                $details['abort_url'] = (string)$cancelUri;
+            }
+
+            if (false == $details['notify_url'] && $request->getToken() && $this->tokenFactory) {
+                $notifyToken = $this->tokenFactory->createNotifyToken(
+                    $request->getToken()->getGatewayName(),
+                    $request->getToken()->getDetails()
+                );
+
+                $details['notify_url'] = $notifyToken->getTargetUrl();
+            }
+
+            $this->gateway->execute(new CreateTransaction($details));
+        }
+
+        $this->gateway->execute(new Sync($details));
+
+        if($details['transaction_id'] !== false) {
+            $this->gateway->execute(new CapturePayment($details));
         }
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function supports($request)
     {
         return
             $request instanceof Capture &&
-            $request->getModel() instanceof \ArrayAccess;
+            $request->getModel() instanceof \ArrayAccess
+        ;
     }
 }
