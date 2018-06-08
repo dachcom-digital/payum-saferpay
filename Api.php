@@ -2,6 +2,7 @@
 
 namespace DachcomDigital\Payum\Saferpay;
 
+use DachcomDigital\Payum\Saferpay\Handler\LockHandler;
 use DachcomDigital\Payum\Saferpay\Handler\RequestHandler;
 use Http\Message\MessageFactory;
 use Payum\Core\Bridge\Spl\ArrayObject;
@@ -14,6 +15,11 @@ class Api
      * @var RequestHandler
      */
     protected $requestHandler;
+
+    /**
+     * @var LockHandler
+     */
+    protected $lockHandler;
 
     const TEST = 'test';
 
@@ -39,15 +45,29 @@ class Api
             'password',
             'spec_version',
             'customer_id',
-            'terminal_id'
+            'terminal_id',
+            'lock_path'
         ]);
 
         if (false == is_bool($options['sandbox'])) {
             throw new LogicException('The boolean sandbox option must be set.');
         }
 
+        if (false == is_dir($options['lock_path'])) {
+            throw new LogicException(sprintf('%s is not a valid lock_path'));
+        }
+
         $this->options = $options;
         $this->requestHandler = new RequestHandler($client, $messageFactory, $this->options);
+        $this->lockHandler = new LockHandler($this->options['lock_path']);
+    }
+
+    /**
+     * @return LockHandler
+     */
+    public function getLockHandler()
+    {
+        return $this->lockHandler;
     }
 
     /**
@@ -136,6 +156,7 @@ class Api
             $params['transaction_id'] = $response['transaction_id'];
             $params['transaction_status'] = $response['transaction_status'];
             $params['transaction_date'] = $response['date'];
+            $params['transaction_captured'] = true;
         }
 
         return array_filter($params);

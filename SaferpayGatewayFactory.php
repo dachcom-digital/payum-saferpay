@@ -41,10 +41,10 @@ class SaferpayGatewayFactory extends GatewayFactory
 
         if (false == $config['payum.api']) {
             $config['payum.default_options'] = [
-                'environment'     => Api::TEST,
-                'specVersion'     => '1.8', //https://saferpay.github.io/jsonapi/index.html
+                'environment'        => Api::TEST,
+                'specVersion'        => '1.8', //https://saferpay.github.io/jsonapi/index.html
                 'optionalParameters' => [],
-                'sandbox'         => true,
+                'sandbox'            => true,
             ];
             $config->defaults($config['payum.default_options']);
             $config['payum.required_options'] = [
@@ -52,7 +52,8 @@ class SaferpayGatewayFactory extends GatewayFactory
                 'password',
                 'specVersion',
                 'customerId',
-                'terminalId'
+                'terminalId',
+                'lockPath'
             ];
 
             $config['payum.api'] = function (ArrayObject $config) {
@@ -66,6 +67,7 @@ class SaferpayGatewayFactory extends GatewayFactory
                         'spec_version'    => $config['specVersion'],
                         'customer_id'     => $config['customerId'],
                         'terminal_id'     => $config['terminalId'],
+                        'lock_path'       => $config['lockPath'],
                         'optional_params' => isset($config['optionalParameters']) && is_array($config['optionalParameters']) ? $config['optionalParameters'] : []
                     ],
                     $config['payum.http_client'],

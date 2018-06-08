@@ -2,19 +2,32 @@
 
 namespace DachcomDigital\Payum\Saferpay\Action;
 
+use DachcomDigital\Payum\Saferpay\Api;
 use Payum\Core\Action\ActionInterface;
+use Payum\Core\ApiAwareInterface;
+use Payum\Core\ApiAwareTrait;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Request\GetStatusInterface;
 use Payum\Core\Exception\RequestNotSupportedException;
 
-class StatusAction implements ActionInterface
+class StatusAction implements ActionInterface, ApiAwareInterface
 {
+    use ApiAwareTrait;
+
     const TYPE_PAYMENT = 'PAYMENT';
     const TYPE_REFUND = 'REFUND';
 
     const STATUS_AUTHORIZED = 'AUTHORIZED';
     const STATUS_CAPTURED = 'CAPTURED';
     const STATUS_PENDING = 'PENDING';
+
+    /**
+     * CaptureAction constructor.
+     */
+    public function __construct()
+    {
+        $this->apiClass = Api::class;
+    }
 
     /**
      * {@inheritdoc}
@@ -35,14 +48,14 @@ class StatusAction implements ActionInterface
             return;
         }
 
-        //handle cancellation and fail
-        if ($details['transaction_cancelled'] === true) {
+        //handle failed cancellation
+        if (isset($details['transaction_cancelled']) && $details['transaction_cancelled'] === true) {
             $request->markCanceled();
             return;
         }
 
         //handle failed transaction
-        if ($details['transaction_failed'] === true) {
+        if (isset($details['transaction_failed']) && $details['transaction_failed'] === true) {
             $request->markFailed();
             return;
         }
@@ -58,6 +71,7 @@ class StatusAction implements ActionInterface
         }
 
         $status = isset($details['transaction_status']) ? $details['transaction_status'] : null;
+
         switch ($details['transaction_type']) {
             case self::TYPE_PAYMENT:
                 switch ($status) {

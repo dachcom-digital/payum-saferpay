@@ -14,6 +14,9 @@ class CapturePaymentAction implements ActionInterface, ApiAwareInterface
 {
     use ApiAwareTrait;
 
+    /**
+     * CapturePaymentAction constructor.
+     */
     public function __construct()
     {
         $this->apiClass = Api::class;
@@ -28,14 +31,20 @@ class CapturePaymentAction implements ActionInterface, ApiAwareInterface
     {
         RequestNotSupportedException::assertSupports($this, $request);
 
-        $model = ArrayObject::ensureArrayObject($request->getModel());
-        $model->validateNotEmpty([
+        $details = ArrayObject::ensureArrayObject($request->getModel());
+        $details->validateNotEmpty([
             'transaction_id',
         ]);
 
-        $model->replace(
-            $this->api->captureTransaction($model['transaction_id'])
+        // transaction already captured
+        if(isset($details['transaction_captured']) && $details['transaction_captured'] === true) {
+            return;
+        }
+
+        $details->replace(
+            $this->api->captureTransaction($details['transaction_id'])
         );
+
     }
 
     /**

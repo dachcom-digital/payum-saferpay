@@ -16,6 +16,9 @@ class CreateTransactionAction implements ActionInterface, ApiAwareInterface
 {
     use ApiAwareTrait;
 
+    /**
+     * CreateTransactionAction constructor.
+     */
     public function __construct()
     {
         $this->apiClass = Api::class;
