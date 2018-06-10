@@ -38,10 +38,6 @@ class LockHandler
      */
     public function unlockTransaction($id)
     {
-        // since we're handling with some sort of a race condition here,
-        // we need to throttle the unlock process for half of a second.
-        usleep(500000);
-
         if ($this->transactionIsLocked($id)) {
             unlink($this->getTransactionLockPath($id));
         }

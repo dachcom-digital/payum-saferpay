@@ -37,7 +37,6 @@ class SyncAction implements ActionInterface, GatewayAwareInterface
     {
         return
             $request instanceof Sync &&
-            $request->getModel() instanceof \ArrayAccess
-        ;
+            $request->getModel() instanceof \ArrayAccess;
     }
 }

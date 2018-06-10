@@ -60,6 +60,12 @@ class StatusAction implements ActionInterface, ApiAwareInterface
             return;
         }
 
+        //handle tmp capture transaction
+        if (isset($details['capture_state_reached']) && $details['capture_state_reached'] === true) {
+            $request->markAuthorized();
+            return;
+        }
+
         if (!isset($details['token']) || !strlen($details['token'])) {
             $request->markNew();
             return;

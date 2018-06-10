@@ -28,7 +28,7 @@ class SaferpayGatewayFactory extends GatewayFactory
 
             'payum.action.capture'         => new CaptureAction(),
             'payum.action.status'          => new StatusAction(),
-            'payum.action.notify'          => new NotifyAction(),
+            'payum.action.notify'          => new NotifyAction($config['payum.security.token_storage']),
             'payum.action.sync'            => new SyncAction(),
             'payum.action.refund'          => new RefundAction(),
             'payum.action.convert_payment' => new ConvertPaymentAction(),

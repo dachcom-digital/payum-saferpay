@@ -18,7 +18,6 @@ use Payum\Core\Request\Capture;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use DachcomDigital\Payum\Saferpay\Api;
 use DachcomDigital\Payum\Saferpay\Request\Api\CreateTransaction;
-use DachcomDigital\Payum\Saferpay\Request\Api\CapturePayment;
 
 class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
 {
@@ -91,22 +90,8 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
             $this->gateway->execute(new CreateTransaction($details));
         }
 
-        if($this->api->getLockHandler()->transactionIsLocked($details['token'])) {
-            return;
-        }
-
-         // set lock
-        $this->api->getLockHandler()->lockTransaction($details['token']);
-
+        $details['capture_state_reached'] = true;
         $this->gateway->execute(new Sync($details));
-
-        if (isset($details['transaction_status']) && in_array($details['transaction_status'], ['PENDING', 'AUTHORIZED'])) {
-            $this->gateway->execute(new CapturePayment($details));
-        }
-
-        $this->gateway->execute(new Sync($details));
-
-        $this->api->getLockHandler()->unlockTransaction($details['token']);
 
     }
 
@@ -117,7 +102,6 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
     {
         return
             $request instanceof Capture &&
-            $request->getModel() instanceof \ArrayAccess
-        ;
+            $request->getModel() instanceof \ArrayAccess;
     }
 }
