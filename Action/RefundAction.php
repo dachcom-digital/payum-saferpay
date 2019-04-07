@@ -28,8 +28,13 @@ class RefundAction implements ActionInterface, GatewayAwareInterface
 
         $this->gateway->execute(new RefundTransaction($details));
 
-        if($details['transaction_id'] !== false) {
-            $this->gateway->execute(new CapturePayment($details));
+        // capture refund since everything seems ok so far.
+        if ($details->offsetExists('refund_transaction_type') && $details->get('refund_transaction_type') === 'REFUND') {
+            if ($details->offsetExists('refund_transaction_status') && in_array($details->get('refund_transaction_status'), ['PENDING', 'AUTHORIZED'])) {
+                $capturePayment = new CapturePayment($details);
+                $capturePayment->setType('REFUND');
+                $this->gateway->execute($capturePayment);
+            }
         }
     }
 
@@ -40,7 +45,6 @@ class RefundAction implements ActionInterface, GatewayAwareInterface
     {
         return
             $request instanceof Refund &&
-            $request->getModel() instanceof \ArrayAccess
-        ;
+            $request->getModel() instanceof \ArrayAccess;
     }
 }

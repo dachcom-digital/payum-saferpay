@@ -30,14 +30,12 @@ class RefundTransactionAction implements ActionInterface, ApiAwareInterface
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
         $model->validateNotEmpty([
-            'transaction_id',
+            'capture_id',
             'amount',
             'currency_code',
         ]);
 
-        $model->replace(
-            $this->api->refundTransaction((array) $model)
-        );
+        $model->replace($this->api->refundTransaction((array) $model));
     }
 
     /**
@@ -47,7 +45,6 @@ class RefundTransactionAction implements ActionInterface, ApiAwareInterface
     {
         return
             $request instanceof RefundTransaction &&
-            $request->getModel() instanceof \ArrayAccess
-        ;
+            $request->getModel() instanceof \ArrayAccess;
     }
 }

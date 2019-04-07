@@ -45,7 +45,6 @@ class GetTransactionDataAction implements ActionInterface, ApiAwareInterface
     {
         return
             $request instanceof GetTransactionData &&
-            $request->getModel() instanceof \ArrayAccess
-        ;
+            $request->getModel() instanceof \ArrayAccess;
     }
 }

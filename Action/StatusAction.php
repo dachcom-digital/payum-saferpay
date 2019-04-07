@@ -21,9 +21,6 @@ class StatusAction implements ActionInterface, ApiAwareInterface
     const STATUS_CAPTURED = 'CAPTURED';
     const STATUS_PENDING = 'PENDING';
 
-    /**
-     * CaptureAction constructor.
-     */
     public function __construct()
     {
         $this->apiClass = Api::class;
@@ -40,46 +37,39 @@ class StatusAction implements ActionInterface, ApiAwareInterface
 
         $details = ArrayObject::ensureArrayObject($request->getModel());
 
-        if (!isset($details['transaction_status'])
-            && isset($details['token'])
-            && isset($details['expiration'])
-            && !is_null($details['expiration']) && $details['expiration'] < time()) {
-            $request->markExpired();
+        if (!$details->offsetExists('token') || $details->offsetGet('token') === null) {
+            $request->markNew();
             return;
         }
 
-        //handle failed cancellation
-        if (isset($details['transaction_cancelled']) && $details['transaction_cancelled'] === true) {
-            $request->markCanceled();
-            return;
-        }
-
-        //handle failed transaction
-        if (isset($details['transaction_failed']) && $details['transaction_failed'] === true) {
-            $request->markFailed();
-            return;
-        }
-
-        //handle tmp capture transaction
-        if (isset($details['capture_state_reached']) && $details['capture_state_reached'] === true) {
+        if ($details->offsetExists('capture_authorized_or_pending') && $details->offsetGet('capture_authorized_or_pending') === true) {
             $request->markAuthorized();
             return;
         }
 
-        if (!isset($details['token']) || !strlen($details['token'])) {
+        if ($details->offsetExists('transaction_cancelled') && $details->get('transaction_cancelled') === true) {
+            $request->markCanceled();
+            return;
+        }
+
+        if ($details->offsetExists('transaction_failed') && $details->get('transaction_failed') === true) {
+            $request->markFailed();
+            return;
+        }
+
+        if (!$details->offsetExists('transaction_status')) {
             $request->markNew();
             return;
         }
 
-        if (!isset($details['transaction_status'])) {
-            $request->markNew();
+        if ($details->offsetExists('expiration') && !is_null($details->get('expiration')) && $details->get('expiration') < time()) {
+            $request->markExpired();
             return;
         }
 
-        $status = isset($details['transaction_status']) ? $details['transaction_status'] : null;
-
-        switch ($details['transaction_type']) {
+        switch ($details->get('transaction_type')) {
             case self::TYPE_PAYMENT:
+                $status = $details->offsetExists('transaction_status') ? $details->get('transaction_status') : null;
                 switch ($status) {
                     case self::STATUS_AUTHORIZED:
                         $request->markAuthorized();
@@ -96,6 +86,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface
                 }
                 break;
             case self::TYPE_REFUND:
+                $status = $details->offsetExists('refund_transaction_status') ? $details->get('refund_transaction_status') : null;
                 switch ($status) {
                     case self::STATUS_AUTHORIZED:
                         $request->markAuthorized();

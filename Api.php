@@ -2,7 +2,6 @@
 
 namespace DachcomDigital\Payum\Saferpay;
 
-use DachcomDigital\Payum\Saferpay\Handler\LockHandler;
 use DachcomDigital\Payum\Saferpay\Handler\RequestHandler;
 use Http\Message\MessageFactory;
 use Payum\Core\Bridge\Spl\ArrayObject;
@@ -11,20 +10,17 @@ use Payum\Core\HttpClientInterface;
 
 class Api
 {
+    const TEST = 'test';
+    const PRODUCTION = 'production';
+
     /**
      * @var RequestHandler
      */
     protected $requestHandler;
 
     /**
-     * @var LockHandler
+     * @var array|ArrayObject
      */
-    protected $lockHandler;
-
-    const TEST = 'test';
-
-    const PRODUCTION = 'production';
-
     protected $options = [
         'environment' => self::TEST
     ];
@@ -54,20 +50,11 @@ class Api
         }
 
         if (false == is_dir($options['lock_path'])) {
-            throw new LogicException(sprintf('%s is not a valid lock_path'));
+            throw new LogicException(sprintf('%s is not a valid lock_path', $options['lock_path']));
         }
 
         $this->options = $options;
         $this->requestHandler = new RequestHandler($client, $messageFactory, $this->options);
-        $this->lockHandler = new LockHandler($this->options['lock_path']);
-    }
-
-    /**
-     * @return LockHandler
-     */
-    public function getLockHandler()
-    {
-        return $this->lockHandler;
     }
 
     /**
@@ -141,10 +128,12 @@ class Api
     }
 
     /**
-     * @param $transactionId
+     * @param string $transactionId
+     * @param null   $transactionType
+     *
      * @return array
      */
-    public function captureTransaction($transactionId)
+    public function captureTransaction($transactionId, $transactionType = null)
     {
         $response = $this->requestHandler->createTransactionCaptureRequest($transactionId);
 
@@ -153,10 +142,16 @@ class Api
         if ($response['has_error'] === true) {
             $params['error'] = $response['error'];
         } else {
-            $params['transaction_id'] = $response['transaction_id'];
-            $params['transaction_status'] = $response['transaction_status'];
-            $params['transaction_date'] = $response['date'];
-            $params['transaction_captured'] = true;
+
+            if ($transactionType === 'PAYMENT') {
+                $params['capture_id'] = $response['capture_id'];
+                $params['transaction_status'] = $response['transaction_status'];
+                $params['transaction_date'] = $response['date'];
+            } else {
+                $params[sprintf('%s_capture_id', strtolower($transactionType))] = $response['capture_id'];
+                $params[sprintf('%s_transaction_status', strtolower($transactionType))] = $response['transaction_status'];
+                $params[sprintf('%s_transaction_date', strtolower($transactionType))] = $response['date'];
+            }
         }
 
         return array_filter($params);
@@ -177,15 +172,14 @@ class Api
             $params['error'] = $response['error'];
         } else {
             $transaction = $response['transaction'];
-            $params['transaction_id'] = $transaction['Id'];
-            $params['transaction_type'] = $transaction['Type'];
-            $params['transaction_status'] = $transaction['Status'];
-            $params['transaction_date'] = $transaction['Date'];
-            $params['transaction_amount'] = $transaction['Amount']['Value'];
-            $params['transaction_currency_code'] = $transaction['Amount']['CurrencyCode'];
+            $params['refund_transaction_type'] = $transaction['Type'];
+            $params['refund_transaction_id'] = $transaction['Id'];
+            $params['refund_transaction_status'] = $transaction['Status'];
+            $params['refund_transaction_date'] = $transaction['Date'];
+            $params['refund_transaction_amount'] = $transaction['Amount']['Value'];
+            $params['refund_transaction_currency_code'] = $transaction['Amount']['CurrencyCode'];
         }
 
         return array_filter($params);
-
     }
 }

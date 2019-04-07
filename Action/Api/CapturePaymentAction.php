@@ -32,19 +32,16 @@ class CapturePaymentAction implements ActionInterface, ApiAwareInterface
         RequestNotSupportedException::assertSupports($this, $request);
 
         $details = ArrayObject::ensureArrayObject($request->getModel());
-        $details->validateNotEmpty([
-            'transaction_id',
-        ]);
 
-        // transaction already captured
-        if(isset($details['transaction_captured']) && $details['transaction_captured'] === true) {
-            return;
+        $transactionIdKey = null;
+        if ($request->getType() === 'PAYMENT') {
+            $transactionIdKey = 'transaction_id';
+        } else {
+            $transactionIdKey = sprintf('%s_transaction_id', strtolower($request->getType()));
         }
 
-        $details->replace(
-            $this->api->captureTransaction($details['transaction_id'])
-        );
-
+        $details->validateNotEmpty([$transactionIdKey]);
+        $details->replace($this->api->captureTransaction($details->get($transactionIdKey), $request->getType()));
     }
 
     /**

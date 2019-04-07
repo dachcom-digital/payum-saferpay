@@ -46,6 +46,7 @@ class RequestHandler
 
     /**
      * @param $data
+     *
      * @return array
      */
     public function createTransactionRequest($data)
@@ -110,6 +111,7 @@ class RequestHandler
 
     /**
      * @param $token
+     *
      * @return array
      */
     public function createTransactionAssertRequest($token)
@@ -150,6 +152,7 @@ class RequestHandler
 
     /**
      * @param $transactionId
+     *
      * @return array
      */
     public function createTransactionCaptureRequest($transactionId)
@@ -170,7 +173,7 @@ class RequestHandler
         $request = $this->doRequest($requestData, $url);
 
         $response = [
-            'transaction_id'     => null,
+            'capture_id'         => null,
             'transaction_status' => null,
             'date'               => null,
             'has_error'          => false,
@@ -179,11 +182,9 @@ class RequestHandler
 
         if ($request['error'] === false) {
             $responseData = $request['data'];
-            $response['transaction_id'] = $responseData['TransactionId'];
+            $response['capture_id'] = $responseData['CaptureId'];
             $response['transaction_status'] = $responseData['Status'];
             $response['date'] = $responseData['Date'];
-            //implement invoice data
-            //$invoiceData = $responseData['Invoice'];
         } else {
             $response['has_error'] = true;
             $response['error'] = $request['data'];
@@ -194,25 +195,26 @@ class RequestHandler
 
     /**
      * @param $data
+     *
      * @return array
      */
     public function createRefundRequest($data)
     {
         $requestData = [
-            'RequestHeader'        => [
+            'RequestHeader'    => [
                 'SpecVersion'    => $this->options['spec_version'],
                 'CustomerId'     => $this->options['customer_id'],
                 'RequestId'      => uniqid(),
                 'RetryIndicator' => 0,
             ],
-            'Refund'               => [
+            'Refund'           => [
                 'Amount' => [
                     'Value'        => $data['amount'],
                     'CurrencyCode' => $data['currency_code']
                 ]
             ],
-            'TransactionReference' => [
-                'TransactionId' => $data['transaction_id']
+            'CaptureReference' => [
+                'CaptureId' => $data['capture_id']
             ],
         ];
 
@@ -243,6 +245,7 @@ class RequestHandler
     /**
      * @param $data
      * @param $url
+     *
      * @return array
      */
     private function doRequest($data, $url)
@@ -262,7 +265,10 @@ class RequestHandler
         $request = $this->messageFactory->createRequest('POST', $url, $headers, json_encode($data));
         $response = $this->client->send($request);
 
-        if ($response->getStatusCode() === 400) {
+        if ($response->getStatusCode() >= 500) {
+            $responseData['error'] = true;
+            $responseData['data'] = 'Error ' . $response->getStatusCode() . ': ' . $response->getReasonPhrase();
+        } elseif ($response->getStatusCode() >= 400) {
             $data = json_decode($response->getBody()->getContents(), true);
             $responseData['error'] = true;
             $responseData['data'] = [
@@ -271,9 +277,6 @@ class RequestHandler
                 'error_message' => $data['ErrorMessage'],
                 'error_detail'  => $data['ErrorDetail']
             ];
-        } elseif (false == ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300)) {
-            $responseData['error'] = true;
-            $responseData['data'] = 'Error ' . $response->getStatusCode() . ': ' . $response->getReasonPhrase();
         } else {
             $content = json_decode($response->getBody()->getContents(), true);
             $responseData['data'] = $content;
@@ -297,6 +300,7 @@ class RequestHandler
     /**
      * @param $requestData
      * @param $data
+     *
      * @return mixed
      */
     private function mergeOptionalPaymentExtensionData($requestData, $data)
@@ -328,7 +332,7 @@ class RequestHandler
          * zh - Chinese
          */
         if (isset($data['optional_payer_language_code'])) {
-            $requestData['Payer']['LanguageCode'] = (string)$data['optional_payer_language_code'];
+            $requestData['Payer']['LanguageCode'] = (string) $data['optional_payer_language_code'];
         }
 
         return $requestData;
@@ -338,6 +342,7 @@ class RequestHandler
     /**
      * @param $requestData
      * @param $data
+     *
      * @return mixed
      */
     private function mergeOptionalApiOptions($requestData, $data)
@@ -347,7 +352,7 @@ class RequestHandler
          * Example: name of your payment page config (case-insensitive)
          */
         if (isset($data['config_set'])) {
-            $requestData['ConfigSet'] = (string)$data['config_set'];
+            $requestData['ConfigSet'] = (string) $data['config_set'];
         }
 
         /**

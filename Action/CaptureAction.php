@@ -49,50 +49,78 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
 
         if (isset($httpRequest->query['cancelled'])) {
             $details['transaction_cancelled'] = true;
+            return;
         }
 
         if (isset($httpRequest->query['failed'])) {
             $details['transaction_failed'] = true;
+            return;
         }
 
-        if (false == $details['token']) {
-
-            if (false == $details['success_url'] && $request->getToken()) {
-                $successUrl = HttpUri::createFromString($request->getToken()->getTargetUrl());
-                $modifier = new MergeQuery('success=1');
-                $successUrl = $modifier->process($successUrl);
-                $details['success_url'] = (string)$successUrl;
-            }
-
-            if (false == $details['fail_url'] && $request->getToken()) {
-                $failedUrl = HttpUri::createFromString($request->getToken()->getTargetUrl());
-                $modifier = new MergeQuery('failed=1');
-                $failedUrl = $modifier->process($failedUrl);
-                $details['fail_url'] = (string)$failedUrl;
-            }
-
-            if (false == $details['abort_url'] && $request->getToken()) {
-                $cancelUri = HttpUri::createFromString($request->getToken()->getTargetUrl());
-                $modifier = new MergeQuery('cancelled=1');
-                $cancelUri = $modifier->process($cancelUri);
-                $details['abort_url'] = (string)$cancelUri;
-            }
-
-            if (false == $details['notify_url'] && $request->getToken() && $this->tokenFactory) {
-                $notifyToken = $this->tokenFactory->createNotifyToken(
-                    $request->getToken()->getGatewayName(),
-                    $request->getToken()->getDetails()
-                );
-
-                $details['notify_url'] = $notifyToken->getTargetUrl();
-            }
-
-            $this->gateway->execute(new CreateTransaction($details));
+        // no token given, we need to initialize payment page first.
+        if (!$details->offsetExists('token') || $details->offsetGet('token') === null) {
+            $this->paymentPageInitializeAction($request, $details);
+            return;
         }
 
-        $details['capture_state_reached'] = true;
+        // we're back from payment page. let's assert the payment
+        $this->paymentPageAssertAction($request, $details);
+
+    }
+
+    /**
+     * @param Capture     $request
+     * @param ArrayObject $details
+     */
+    protected function paymentPageInitializeAction(Capture $request, ArrayObject $details)
+    {
+        if (!$details->offsetExists('success_url')) {
+            $successUrl = HttpUri::createFromString($request->getToken()->getTargetUrl());
+            $modifier = new MergeQuery('success=1');
+            $successUrl = $modifier->process($successUrl);
+            $details->offsetSet('success_url', (string) $successUrl);
+        }
+
+        if (!$details->offsetExists('fail_url')) {
+            $failedUrl = HttpUri::createFromString($request->getToken()->getTargetUrl());
+            $modifier = new MergeQuery('failed=1');
+            $failedUrl = $modifier->process($failedUrl);
+            $details->offsetSet('fail_url', (string) $failedUrl);
+        }
+
+        if (!$details->offsetExists('abort_url')) {
+            $cancelUri = HttpUri::createFromString($request->getToken()->getTargetUrl());
+            $modifier = new MergeQuery('cancelled=1');
+            $cancelUri = $modifier->process($cancelUri);
+            $details->offsetSet('abort_url', (string) $cancelUri);
+        }
+
+        if (!$details->offsetExists('notify_url')) {
+            $notifyToken = $this->tokenFactory->createNotifyToken(
+                $request->getToken()->getGatewayName(),
+                $request->getToken()->getDetails()
+            );
+            $details->offsetSet('notify_url', $notifyToken->getTargetUrl());
+        }
+
+        $this->gateway->execute(new CreateTransaction($details));
+    }
+
+    /**
+     * @param Capture     $request
+     * @param ArrayObject $details
+     */
+    protected function paymentPageAssertAction(Capture $request, ArrayObject $details)
+    {
+        // get current payment status directly from saferpay.
         $this->gateway->execute(new Sync($details));
 
+        // mark payment as captured since everything seems ok so far.
+        // we dont actually capture payment here -> the notify action needs to do this.
+        // otherwise we'll run into a multi thread action loop
+        if ($details->offsetExists('transaction_status') && in_array($details->get('transaction_status'), ['PENDING', 'AUTHORIZED'])) {
+            $details->replace(['capture_authorized_or_pending' => true]);
+        }
     }
 
     /**

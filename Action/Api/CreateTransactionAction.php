@@ -55,7 +55,6 @@ class CreateTransactionAction implements ActionInterface, ApiAwareInterface
     {
         return
             $request instanceof CreateTransaction &&
-            $request->getModel() instanceof \ArrayAccess
-        ;
+            $request->getModel() instanceof \ArrayAccess;
     }
 }

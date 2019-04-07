@@ -25,7 +25,7 @@ class SyncAction implements ActionInterface, GatewayAwareInterface
 
         $details = ArrayObject::ensureArrayObject($request->getModel());
 
-        if ($details['token']) {
+        if ($details->offsetExists('token')) {
             $this->gateway->execute(new GetTransactionData($details));
         }
     }
