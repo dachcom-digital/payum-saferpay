@@ -62,6 +62,7 @@ class SaferpayGatewayFactory extends GatewayFactory
                 return new Api(
                     [
                         'sandbox'         => $config['environment'] === Api::TEST,
+                        'payment_methods' => $config['paymentMethods'],
                         'username'        => $config['username'],
                         'password'        => $config['password'],
                         'spec_version'    => $config['specVersion'],

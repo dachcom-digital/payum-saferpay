@@ -22,7 +22,8 @@ class Api
      * @var array|ArrayObject
      */
     protected $options = [
-        'environment' => self::TEST
+        'environment' => self::TEST,
+        'payment_methods' => []
     ];
 
     /**
