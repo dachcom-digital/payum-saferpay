@@ -22,7 +22,8 @@ class Api
      * @var array|ArrayObject
      */
     protected $options = [
-        'environment' => self::TEST
+        'environment' => self::TEST,
+        'payment_methods' => []
     ];
 
     /**
@@ -89,39 +90,42 @@ class Api
         } else {
 
             $transaction = $response['transaction'];
-            $params['transaction_type'] = $transaction['Type'];
-            $params['transaction_status'] = $transaction['Status'];
-            $params['transaction_id'] = $transaction['Id'];
-            $params['transaction_date'] = $transaction['Date'];
-            $params['transaction_amount'] = $transaction['Amount']['Value'];
-            $params['transaction_currency_code'] = $transaction['Amount']['CurrencyCode'];
-            $params['transaction_acquirer_name'] = $transaction['AcquirerName'];
-            $params['transaction_acquirer_reference'] = $transaction['AcquirerReference'];
-            $params['transaction_six_transaction_reference'] = $transaction['SixTransactionReference'];
-            $params['transaction_approval_code'] = $transaction['ApprovalCode'];
+            $params['transaction_type'] = $transaction['Type'] ?? null;
+            $params['transaction_status'] = $transaction['Status'] ?? null;
+            $params['transaction_id'] = $transaction['Id'] ?? null;
+            $params['transaction_date'] = $transaction['Date'] ?? null;
+            $params['transaction_amount'] = $transaction['Amount']['Value'] ?? null;
+            $params['transaction_currency_code'] = $transaction['Amount']['CurrencyCode'] ?? null;
+            $params['transaction_acquirer_name'] = $transaction['AcquirerName'] ?? null;
+            $params['transaction_acquirer_reference'] = $transaction['AcquirerReference'] ?? null;
+            $params['transaction_six_transaction_reference'] = $transaction['SixTransactionReference'] ?? null;
+            $params['transaction_approval_code'] = $transaction['ApprovalCode'] ?? null;
 
-            $paymentMeans = $response['payment_means'];
-            $params['payment_means_brand_payment_method'] = $paymentMeans['Brand']['PaymentMethod'];
-            $params['payment_means_brand_name'] = $paymentMeans['Brand']['Name'];
+            $paymentMeans = $response['payment_means'] ?? [];
+            $brand = $paymentMeans['Brand'] ?? [];
+            $params['payment_means_brand_payment_method'] = $brand['PaymentMethod'] ?? null;;
+            $params['payment_means_brand_name'] = $brand['Name'] ?? null;;
 
-            $params['payment_means_display_text'] = $paymentMeans['DisplayText'];
-            $params['payment_means_wallet'] = $paymentMeans['Wallet'];
+            $params['payment_means_display_text'] = $paymentMeans['DisplayText'] ?? null;;
+            $params['payment_means_wallet'] = $paymentMeans['Wallet'] ?? null;
 
-            $params['payment_means_cart_masked_number'] = $paymentMeans['Card']['MaskedNumber'];
-            $params['payment_means_cart_exp_year'] = $paymentMeans['Card']['ExpYear'];
-            $params['payment_means_cart_exp_month'] = $paymentMeans['Card']['ExpMonth'];
-            $params['payment_means_cart_holder_name'] = $paymentMeans['Card']['HolderName'];
-            $params['payment_means_cart_hash_value'] = $paymentMeans['Card']['HashValue'];
+            $cardData = $paymentMeans['Card'] ?? [];
+            $params['payment_means_cart_masked_number'] = $cardData['MaskedNumber'] ?? null;;
+            $params['payment_means_cart_exp_year'] = $cardData['ExpYear'] ?? null;;
+            $params['payment_means_cart_exp_month'] = $cardData['ExpMonth'] ?? null;;
+            $params['payment_means_cart_holder_name'] = $cardData['HolderName'] ?? null;;
+            $params['payment_means_cart_hash_value'] = $cardData['HashValue'] ?? null;
 
-            $params['payment_means_bank_account_iban'] = $paymentMeans['BankAccount']['IBAN'];
-            $params['payment_means_bank_account_holder_name'] = $paymentMeans['BankAccount']['HolderName'];
-            $params['payment_means_bank_account_bic'] = $paymentMeans['BankAccount']['BIC'];
-            $params['payment_means_bank_account_bank_name'] = $paymentMeans['BankAccount']['BankName'];
-            $params['payment_means_bank_account_country_code'] = $paymentMeans['BankAccount']['CountryCode'];
+            $bankAccountData = $paymentMeans['BankAccount'] ?? [];
+            $params['payment_means_bank_account_iban'] = $bankAccountData['IBAN'] ?? null;
+            $params['payment_means_bank_account_holder_name'] = $bankAccountData['HolderName'] ?? null;
+            $params['payment_means_bank_account_bic'] = $bankAccountData['BIC'] ?? null;
+            $params['payment_means_bank_account_bank_name'] = $bankAccountData['BankName'] ?? null;
+            $params['payment_means_bank_account_country_code'] = $bankAccountData['CountryCode'] ?? null;
 
-            $payer = $response['payer'];
-            $params['payment_payer_ip_address'] = $payer['IpAddress'];
-            $params['payment_payer_ip_location'] = $payer['IpLocation'];
+            $payer = $response['payer'] ?? [];
+            $params['payment_payer_ip_address'] = $payer['IpAddress'] ?? null;
+            $params['payment_payer_ip_location'] = $payer['IpLocation'] ?? null;
         }
 
         return array_filter($params);

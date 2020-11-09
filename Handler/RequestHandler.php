@@ -77,6 +77,11 @@ class RequestHandler
             ]
         ];
 
+        if (!empty($this->options['payment_methods']))
+        {
+            $requestData['PaymentMethods'] = $this->options['payment_methods'];
+        }
+
         // merge additional data coming from the convert payment action (and extensions) like language
         $requestData = $this->mergeOptionalPaymentExtensionData($requestData, $data);
 
